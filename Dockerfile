@@ -33,7 +33,7 @@ COPY requirements.txt ./
 # Keep the llama.cpp source build inside Render's 8 GB build limit:
 # one compilation job, lighter optimization, no debug info.
 ENV CMAKE_BUILD_PARALLEL_LEVEL=1
-ENV CMAKE_ARGS="-DCMAKE_C_FLAGS_RELEASE=-O1 -DNDEBUG -DCMAKE_CXX_FLAGS_RELEASE=-O1 -DNDEBUG"
+ENV CMAKE_ARGS="-DCMAKE_C_FLAGS_RELEASE=-O1 -DCMAKE_CXX_FLAGS_RELEASE=-O1"
 
 RUN pip install -r requirements.txt
 

@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: meridian-demo
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /v1/demo/health

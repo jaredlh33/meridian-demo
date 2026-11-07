@@ -29,6 +29,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY requirements.txt ./
+
+# Keep the llama.cpp source build inside Render's 8 GB build limit:
+# one compilation job, lighter optimization, no debug info.
+ENV CMAKE_BUILD_PARALLEL_LEVEL=1
+ENV CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-O1 -g0 -DCMAKE_CXX_FLAGS=-O1 -g0"
+
 RUN pip install -r requirements.txt
 
 COPY provider/ ./provider/
@@ -40,7 +46,7 @@ COPY demo/ ./demo/
 ARG SMOL_SHA256=48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201
 RUN mkdir -p models \
     && curl -L --fail -o models/smollm2-360m-instruct-q8_0.gguf \
-        "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf?download=true" \
+        "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf" \
     && echo "$SMOL_SHA256  models/smollm2-360m-instruct-q8_0.gguf" | sha256sum -c -
 
 # Render sets $PORT (default 10000); plain docker runs use 8181.

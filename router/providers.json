@@ -1,0 +1,26 @@
+[
+ {
+  "channel_id": "chan-qwen-001",
+  "model_id": "qwen2.5-0.5b",
+  "price_in": 200,
+  "price_out": 500,
+  "url": "http://127.0.0.1:8101",
+  "weights_sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db"
+ },
+ {
+  "channel_id": "chan-smollm-001",
+  "model_id": "smollm2-360m",
+  "price_in": 120,
+  "price_out": 300,
+  "url": "http://127.0.0.1:8102",
+  "weights_sha256": "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201"
+ },
+ {
+  "channel_id": "chan-smollm-002",
+  "model_id": "smollm2-360m",
+  "price_in": 100,
+  "price_out": 250,
+  "url": "http://127.0.0.1:8103",
+  "weights_sha256": "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201"
+ }
+]

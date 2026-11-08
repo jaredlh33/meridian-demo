@@ -1,0 +1,28 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run tests with coverage
+        run: |
+          pip install coverage
+          coverage run --source=demo,provider,router -m unittest discover -s tests
+          coverage xml
+          coverage report -m
+      - name: Upload coverage to Codecov
+        # Public repo: tokenless upload works via the GitHub OIDC token.
+        # If the upload ever fails, add a CODECOV_TOKEN repository secret
+        # (from https://app.codecov.io/gh/jaredlh33/meridian-demo/settings)
+        # and set `token: ${{ secrets.CODECOV_TOKEN }}` here.
+        uses: codecov/codecov-action@v5

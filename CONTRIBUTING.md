@@ -39,6 +39,26 @@ backend (validation, rate limiting, CORS, verification-failure 503).
 Tests must pass before a pull request, and major new functionality must
 come with tests for it.
 
+## Lint and static analysis
+
+```bash
+source .venv/bin/activate
+pip install ruff bandit   # dev tools only — not in requirements.txt,
+                          # not shipped in the Docker image
+ruff check .              # lint config lives in pyproject.toml
+bandit -r demo provider router
+PYTHONWARNINGS=error::ResourceWarning python -m unittest discover -s tests
+```
+
+All three run in CI on every push and pull request (see
+`.github/workflows/tests.yml`). The suite must be warning-clean:
+`ResourceWarning` is an error in CI, so an unclosed socket or file
+fails the run. Known exception: importing `llama_cpp` leaks a
+`/dev/null` handle inside that library — `provider/server.py` imports
+it lazily in `Provider.__init__` so the leak never appears in the test
+path (and `main()` still fails fast at startup if llama.cpp is
+missing).
+
 ## The fingerprint canary is build-sensitive
 
 The fingerprint check greedy-decodes a fixed canary prompt and compares

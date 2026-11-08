@@ -1,0 +1,24 @@
+# Meridian lint configuration (ruff).
+#
+# `ruff check .` runs in CI on every push/PR. Formatting is NOT
+# enforced (no `ruff format --check` in CI) — check only.
+#
+# Rule selection (explicit, so upgrades never silently widen it):
+#   E   pycodestyle errors (incl. E402: imports not at top of file —
+#       the two `# noqa: E402` sites below sys.path hacks are real)
+#   F   pyflakes (unused imports/variables)
+#   UP  pyupgrade (datetime.UTC, format specifiers, ...)
+#   I   isort (import ordering)
+#   B   flake8-bugbear
+#   BLE flake8-blind-except — broad `except Exception` sites carry a
+#       `# noqa: BLE001` with a justification, matching the router's
+#       fall-through / surface-as-500 patterns
+#   RUF ruff's own rules (incl. RUF100: unused noqa directives)
+# Security scanning is bandit's job (`bandit -r demo provider router`),
+# not ruff's, so the S rules are not selected here.
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "I", "B", "BLE", "RUF"]

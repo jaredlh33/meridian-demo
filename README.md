@@ -1,6 +1,6 @@
 # Meridian Demo — Render deploy
 
-Live demo backend for [Meridian](https://meridian-2qtxzg07u-slm-e395.vercel.app/): real local GGUF inference on CPU with per-request fingerprint verification. No external inference API, no keys, no payments.
+Live demo backend for [Meridian](https://meridian-alpha-jet.vercel.app/): real local GGUF inference on CPU with per-request fingerprint verification. No external inference API, no keys, no payments.
 
 This repo is the **Render free-tier variant**: one model only (SmolLM2-360M, Q8_0), 512-token context, one inference thread — sized to fit Render's free 512 MB web service. The full two-model version lives in the Meridian repo (`demo/`).
 

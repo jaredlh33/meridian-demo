@@ -14,9 +14,18 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Install lint and analysis tools
+        run: pip install ruff bandit coverage
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Static analysis (bandit)
+        run: bandit -r demo provider router
       - name: Run tests with coverage
+        # ResourceWarnings are errors: any unclosed socket/file fails
+        # the run, so leaks can't creep back in silently.
+        env:
+          PYTHONWARNINGS: error::ResourceWarning
         run: |
-          pip install coverage
           coverage run --source=demo,provider,router -m unittest discover -s tests
           coverage xml
           coverage report -m

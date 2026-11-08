@@ -54,23 +54,37 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from voucher import Channel, SessionKey, cost_micro_usd  # noqa: E402
+from voucher import Channel, SessionKey, cost_micro_usd
 
 VERIFY_EVERY = 120  # seconds between re-verifications
 HTTP_TIMEOUT = 120  # seconds for a provider completion
 
 
+def _check_scheme(url: str):
+    """Refuse non-HTTP(S) provider URLs. The router only ever calls
+    URLs from its own operator-controlled registry file, never user
+    input — but a scheme check is cheap defense in depth."""
+    if urlparse(url).scheme not in {"http", "https"}:
+        raise ValueError(f"refusing non-HTTP(S) provider URL: {url!r}")
+
+
 def http_get(url: str, timeout: float = 10.0):
+    _check_scheme(url)
     req = urllib.request.Request(url, method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    # B310 is suppressed on the urlopen below: the URL is
+    # scheme-checked above and comes only from the operator-controlled
+    # provider registry, never user input (see _check_scheme).
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310
         return json.loads(r.read().decode("utf-8"))
 
 
 def http_post_json(url: str, payload: dict, timeout: float = HTTP_TIMEOUT):
+    _check_scheme(url)
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST",
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    # B310 is suppressed on the urlopen below: see http_get.
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310
         return json.loads(r.read().decode("utf-8"))
 
 
@@ -165,8 +179,7 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
-        sys.stderr.write("[router] %s - %s\n" % (self.address_string(),
-                                                  fmt % args))
+        sys.stderr.write(f"[router] {self.address_string()} - {fmt % args}\n")
 
     def _send_json(self, status, obj):
         body = json.dumps(obj).encode("utf-8")
@@ -214,7 +227,8 @@ class Handler(BaseHTTPRequestHandler):
             entries = []
             if os.path.exists(LEDGER_PATH):
                 with open(LEDGER_PATH, encoding="utf-8") as f:
-                    entries = [json.loads(l) for l in f if l.strip()]
+                    entries = [json.loads(line) for line in f
+                               if line.strip()]
             self._send_json(200, {
                 "session_public_key_hex": SESSION.public_hex(),
                 "entries": entries})

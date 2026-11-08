@@ -62,7 +62,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
@@ -291,8 +291,7 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):  # keep stdout readable
-        sys.stderr.write("[demo] %s - %s\n" % (self.address_string(),
-                                                fmt % args))
+        sys.stderr.write(f"[demo] {self.address_string()} - {fmt % args}\n")
 
     # -- plumbing ---------------------------------------------------
     def _cors_headers(self):
@@ -397,7 +396,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         REQUEST_COUNT += 1
         # Timestamp only — the prompt itself is never stored.
-        LAST_REQUEST_AT = datetime.now(timezone.utc).isoformat()
+        LAST_REQUEST_AT = datetime.now(UTC).isoformat()
         result["latency_ms"] = int((time.monotonic() - started) * 1000)
         self._send_json(200, result)
 

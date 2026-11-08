@@ -38,9 +38,19 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+
 # The one and only inference dependency. It bundles llama.cpp; the model
 # file is loaded from local disk and never leaves the machine.
-from llama_cpp import Llama
+#
+# Imported lazily inside Provider.__init__, not at module top:
+# importing llama_cpp opens (and never closes) a /dev/null handle,
+# which shows up as a ResourceWarning in any process that merely
+# imports this module (e.g. the test suite, which stubs the backend).
+# main() constructs a Provider at startup, so a missing llama.cpp
+# still fails fast there.
+def _load_llama():
+    from llama_cpp import Llama
+    return Llama
 
 # Fixed canary prompt used for the fingerprint check. Deterministic:
 # greedy decoding (temperature 0) from fixed weights must reproduce the
@@ -72,8 +82,8 @@ class Provider:
         self.n_ctx = n_ctx
         self._lock = threading.Lock()
         print(f"[provider] loading {model_path} ...", flush=True)
-        self.llm = Llama(model_path=self.model_path, n_ctx=n_ctx,
-                         n_threads=n_threads, verbose=False)
+        self.llm = _load_llama()(model_path=self.model_path, n_ctx=n_ctx,
+                                 n_threads=n_threads, verbose=False)
         print("[provider] model loaded, computing fingerprint ...", flush=True)
         out = self._greedy_complete(CANARY_PROMPT, CANARY_MAX_TOKENS)
         self.fingerprint = {
@@ -141,8 +151,8 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):  # keep stdout readable
-        sys.stderr.write("[provider] %s - %s\n" % (self.address_string(),
-                                                    fmt % args))
+        sys.stderr.write(
+            f"[provider] {self.address_string()} - {fmt % args}\n")
 
     def _send_json(self, status, obj):
         body = json.dumps(obj).encode("utf-8")

@@ -24,7 +24,6 @@ Covered:
 import importlib.util
 import json
 import os
-import sys
 import threading
 import unittest
 import urllib.error
@@ -103,7 +102,13 @@ class TestDemoBackend(unittest.TestCase):
         self.port = self.srv.server_address[1]
         threading.Thread(target=self.srv.serve_forever,
                          daemon=True).start()
-        self.addCleanup(self.srv.shutdown)
+        self.addCleanup(self._stop_server)
+
+    def _stop_server(self):
+        # shutdown() stops serve_forever; server_close() frees the
+        # listening socket. shutdown() alone leaks it (ResourceWarning).
+        self.srv.shutdown()
+        self.srv.server_close()
 
     def _call(self, method, path, body=None):
         url = f"http://127.0.0.1:{self.port}{path}"
@@ -115,11 +120,16 @@ class TestDemoBackend(unittest.TestCase):
             with urllib.request.urlopen(req, timeout=5) as r:
                 return r.status, json.loads(r.read() or b"{}"), r.headers
         except urllib.error.HTTPError as e:
-            raw = e.read()
             try:
-                return e.code, json.loads(raw or b"{}"), e.headers
-            except json.JSONDecodeError:
-                return e.code, {}, e.headers
+                raw = e.read()
+                try:
+                    return e.code, json.loads(raw or b"{}"), e.headers
+                except json.JSONDecodeError:
+                    return e.code, {}, e.headers
+            finally:
+                # The error response owns the client socket; reading
+                # without closing leaks it (ResourceWarning).
+                e.close()
 
     def _chat(self, **kw):
         body = {"prompt": "What is the capital of France?",
@@ -195,7 +205,7 @@ class TestDemoBackend(unittest.TestCase):
                         "POST", "/v1/demo/chat",
                         {"model": "qwen2.5-0.5b"})
                 else:
-                    status, body, _ = self._chat(prompt=bad)
+                    status, _body, _ = self._chat(prompt=bad)
                 self.assertEqual(status, 400)
 
     def test_max_tokens_capped_at_64(self):

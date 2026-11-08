@@ -17,15 +17,13 @@ Covered:
 """
 
 import hashlib
+import importlib.util
 import json
 import os
 import sys
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from unittest import mock
-
-import importlib.util
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "router"))
 
@@ -35,9 +33,20 @@ _spec = importlib.util.spec_from_file_location(
 router_server = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(router_server)
 from voucher import (  # noqa: E402
-    Channel, SessionKey, canonical_message, cost_micro_usd,
-    usage_genesis, usage_next,
+    Channel,
+    SessionKey,
+    canonical_message,
+    cost_micro_usd,
+    usage_genesis,
+    usage_next,
 )
+
+
+def stop_server(srv):
+    # shutdown() stops serve_forever; server_close() frees the
+    # listening socket. shutdown() alone leaks it (ResourceWarning).
+    srv.shutdown()
+    srv.server_close()
 
 
 def make_stub_provider(port, manifest, fingerprint_out,
@@ -153,7 +162,7 @@ class TestProviderVerification(unittest.TestCase):
 
     def tearDown(self):
         for s in self.servers:
-            s.shutdown()
+            stop_server(s)
 
     def _entry(self, port, weights_sha="abc123"):
         return router_server.ProviderEntry(
@@ -208,8 +217,8 @@ class TestRouterFailover(unittest.TestCase):
         bad = make_stub_provider(18211, m, fp_out, fail_chat=True)
         good = make_stub_provider(18212, m, fp_out,
                                   chat_text="second provider answered")
-        self.addCleanup(bad.shutdown)
-        self.addCleanup(good.shutdown)
+        self.addCleanup(stop_server, bad)
+        self.addCleanup(stop_server, good)
         session = SessionKey()
         reg = router_server.Registry([
             {"url": "http://127.0.0.1:18211", "model_id": "stub-model",
@@ -231,7 +240,8 @@ class TestRouterFailover(unittest.TestCase):
                      "max_tokens": 10, "temperature": 0.0,
                      "stream": False})
                 break
-            except Exception:
+            except Exception:  # noqa: BLE001 - mirrors the router
+                # fall-through: any provider failure tries the next one
                 continue
         self.assertIsNotNone(answer)
         self.assertEqual(answer["choices"][0]["message"]["content"],

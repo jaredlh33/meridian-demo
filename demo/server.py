@@ -23,8 +23,10 @@ If any gate fails the request is refused with 503 and verified=false
 — no answer is ever served from an unverified model.
 
 Endpoints
-  GET  /v1/demo/health   {ok, models: [{model_id, verified, ...}],
-                          requests_served}
+  GET  /v1/demo/health   {ok, models: [{model_id, verified, ...,
+                          canary_expected_output_sha256 (full hash),
+                          canary_prompt}], requests_served,
+                          uptime_seconds, last_request_at}
   POST /v1/demo/chat     {prompt (max 500 chars), model,
                           max_tokens (default 32, capped at 64)}
                           -> {answer, model, verified, fingerprint,
@@ -35,7 +37,8 @@ Safety: CORS is open (it is a public demo), but the request rate is
 limited per IP (default 10/min) and prompts are capped at 500 chars
 and 64 output tokens. No API keys, no auth, no payments, no
 persistence. Prompts are never logged or stored — only a request
-counter is kept. CPU inference of 0.5B models is slow-ish
+counter and the timestamp of the last served request are kept
+(no prompt text, ever). CPU inference of 0.5B models is slow-ish
 (~5-20 tok/s); the models are small and answers are short, honestly.
 
 Usage:
@@ -59,6 +62,7 @@ import os
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
@@ -93,6 +97,11 @@ RATE_WINDOW_SECONDS = 60
 BACKEND = None                   # DemoBackend, set in main() / tests
 RATE_LIMITER = None              # RateLimiter, set in main() / tests
 REQUEST_COUNT = 0                # served chat requests, counter only
+START_TIME = time.monotonic()    # process start (monotonic clock)
+LAST_REQUEST_AT = None           # ISO-8601 UTC timestamp of the last
+                                 # successfully served chat request;
+                                 # None until the first one. Timestamp
+                                 # only — prompts are never logged.
 
 
 class VerificationFailed(Exception):
@@ -217,6 +226,9 @@ class ModelInstance:
             "model_id": self.model_id,
             "verified": self.verify()["verified"],
             "weights_sha256": self.provider.weights_sha256[:16],
+            "canary_expected_output_sha256": self.provider.fingerprint[
+                "expected_output_sha256"],
+            "canary_prompt": CANARY_PROMPT,
             "price_in": self.price_in,
             "price_out": self.price_out,
         }
@@ -325,12 +337,14 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": BACKEND.ok(),
                 "models": BACKEND.info(),
                 "requests_served": REQUEST_COUNT,
+                "uptime_seconds": int(time.monotonic() - START_TIME),
+                "last_request_at": LAST_REQUEST_AT,
             })
         else:
             self._error(404, "no such route", "not_found")
 
     def do_POST(self):
-        global REQUEST_COUNT
+        global REQUEST_COUNT, LAST_REQUEST_AT
         path = urlparse(self.path).path
         if path != "/v1/demo/chat":
             self._error(404, "no such route", "not_found")
@@ -382,6 +396,8 @@ class Handler(BaseHTTPRequestHandler):
             self._error(500, str(e), "upstream_error")
             return
         REQUEST_COUNT += 1
+        # Timestamp only — the prompt itself is never stored.
+        LAST_REQUEST_AT = datetime.now(timezone.utc).isoformat()
         result["latency_ms"] = int((time.monotonic() - started) * 1000)
         self._send_json(200, result)
 
